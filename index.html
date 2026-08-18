@@ -472,6 +472,7 @@ let editingId = null;
 let editingMoldId = null;
 let pickedOutcome = '';
 let currentPhotos = [];
+let lastAutoSyncedTime = '';
 
 const grid = document.getElementById('grid');
 const countLine = document.getElementById('countLine');
@@ -921,6 +922,18 @@ function render(){
 }
 
 /* ---------- entry form ---------- */
+function resetTimeSyncTracking(){
+  const v = document.getElementById('in-myTime').value;
+  lastAutoSyncedTime = v === '' ? '' : null;
+}
+function syncMyTimeFromSrc(){
+  const myTimeEl = document.getElementById('in-myTime');
+  if(myTimeEl.value === '' || myTimeEl.value === lastAutoSyncedTime){
+    const val = document.getElementById('in-srcTime').value;
+    myTimeEl.value = val;
+    lastAutoSyncedTime = val;
+  }
+}
 function clearForm(){
   ['title','videoUrl','videoNote','srcContainer','srcVolume','srcTime','srcIngredients',
    'myTime','myIngredients','resultNotes','nextTime','tags','scaleRatio'].forEach(k=>{
@@ -929,6 +942,7 @@ function clearForm(){
   document.getElementById('in-date').value = new Date().toISOString().slice(0,10);
   document.getElementById('in-myContainerSelect').value = '';
   document.getElementById('aiStatusHint').textContent = '';
+  resetTimeSyncTracking();
   pickedOutcome = '';
   currentPhotos = [];
   renderPhotoArea();
@@ -950,6 +964,7 @@ function fillForm(e){
   document.getElementById('in-myContainerSelect').value = e.myContainerId || '';
   document.getElementById('in-scaleRatio').value = e.scaleRatio || '';
   document.getElementById('in-myTime').value = e.myTime || '';
+  resetTimeSyncTracking();
   document.getElementById('in-myIngredients').value = e.myIngredients || '';
   document.getElementById('in-resultNotes').value = e.resultNotes || '';
   document.getElementById('in-nextTime').value = e.nextTime || '';
@@ -999,6 +1014,7 @@ function openModalWithImportedData(data){
   document.getElementById('in-srcIngredients').value = data.srcIngredients || '';
   document.getElementById('in-scaleRatio').value = data.scaleRatio || '';
   document.getElementById('in-myTime').value = data.myTime || '';
+  resetTimeSyncTracking();
   document.getElementById('in-myIngredients').value = data.myIngredients || '';
   document.getElementById('in-resultNotes').value = data.resultNotes || '';
   document.getElementById('in-nextTime').value = data.nextTime || '';
@@ -1160,6 +1176,7 @@ document.getElementById('in-photoFile').addEventListener('change', async (ev)=>{
 
 document.getElementById('in-myContainerSelect').addEventListener('change', recomputeRatio);
 document.getElementById('in-srcVolume').addEventListener('input', recomputeRatio);
+document.getElementById('in-srcTime').addEventListener('input', syncMyTimeFromSrc);
 document.getElementById('aiConvertBtn').addEventListener('click', handleAiConvert);
 document.getElementById('recalcBtn').addEventListener('click', recalcScaledTable);
 document.getElementById('in-srcIngredients').addEventListener('input', ()=>renderMdPreview('in-srcIngredients','srcPreview'));
