@@ -85,7 +85,12 @@
   .card.outcome-okay::before{background:var(--gold);}
   .card.outcome-fail::before{background:var(--berry);}
 
-  .card-photo{width:100%;height:140px;border-radius:10px;object-fit:cover;margin-bottom:12px;display:block;border:1px solid var(--line);}
+  .card-photo-wrap{position:relative;margin-bottom:12px;}
+  .card-photo{width:100%;height:140px;border-radius:10px;object-fit:cover;display:block;border:1px solid var(--line);}
+  .card-photo-badge{
+    position:absolute;bottom:8px;right:8px;background:rgba(43,33,25,0.72);color:#fff;
+    font-family:'IBM Plex Mono', monospace;font-size:11px;padding:2px 8px;border-radius:999px;
+  }
   .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
   .card-title{font-family:'Fraunces', serif;font-weight:600;font-size:19px;margin:0 0 4px;}
   .card-meta{font-size:13px;color:var(--ink-soft);display:flex;gap:10px;flex-wrap:wrap;}
@@ -147,13 +152,25 @@
   .field-hint{font-size:12px;color:var(--ink-soft);margin-top:-2px;}
   .field-hint.warn{color:var(--berry-deep);}
 
-  .field-label-row{display:flex;justify-content:space-between;align-items:center;}
+  .field-label-row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+  .btn-group{display:flex;gap:6px;}
   .mini-btn{
     font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--line-strong);
     background:var(--card);color:var(--ink);cursor:pointer;white-space:nowrap;
   }
   .mini-btn:hover{border-color:var(--gold);}
   .mini-btn:disabled{opacity:.5;cursor:default;}
+
+  .md-preview{margin-top:8px;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .md-preview table{width:100%;border-collapse:collapse;font-size:13px;}
+  .md-preview th{
+    background:var(--paper);text-align:left;padding:6px 10px;
+    font-family:'IBM Plex Mono', monospace;font-size:10px;letter-spacing:.04em;
+    color:var(--gold-deep);text-transform:uppercase;
+  }
+  .md-preview td{padding:6px 10px;border-top:1px solid var(--line);font-family:'IBM Plex Mono', monospace;}
+  .md-preview td:first-child{font-family:'Work Sans',sans-serif;}
+  .md-preview .empty-note{padding:10px 12px;font-size:12px;color:var(--ink-soft);}
 
   .outcome-picker{display:flex;gap:8px;}
   .outcome-opt{
@@ -164,7 +181,8 @@
   .outcome-opt.picked-okay{border-color:var(--gold);background:#F7ECD8;color:var(--gold-deep);font-weight:500;}
   .outcome-opt.picked-fail{border-color:var(--berry);background:#F5E1E6;color:var(--berry-deep);font-weight:500;}
 
-  .modal-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:16px;border-top:1px solid var(--line);}
+  .modal-footer{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;padding-top:16px;border-top:1px solid var(--line);flex-wrap:wrap;}
+  .footer-left{display:flex;gap:6px;flex-wrap:wrap;}
   .btn-danger{background:none;border:none;color:var(--berry-deep);font-size:13px;cursor:pointer;padding:8px 4px;}
   .btn-danger:hover{text-decoration:underline;}
   .btn-primary{
@@ -176,18 +194,20 @@
   .field.invalid input, .field.invalid textarea{border-color:var(--berry);}
   .field.invalid .err{display:block;}
 
-  .photo-upload{
-    border:1px dashed var(--line-strong);border-radius:10px;padding:14px;text-align:center;
-    cursor:pointer;background:var(--paper);color:var(--ink-soft);font-size:13px;
+  .photo-grid{display:flex;flex-wrap:wrap;gap:10px;}
+  .photo-thumb-wrap{position:relative;width:96px;height:96px;flex-shrink:0;}
+  .photo-thumb{width:100%;height:100%;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block;}
+  .photo-thumb-remove{
+    position:absolute;top:-6px;right:-6px;background:rgba(43,33,25,0.8);color:#fff;border:none;
+    border-radius:999px;width:22px;height:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;
   }
-  .photo-upload:hover{border-color:var(--gold);}
-  .photo-preview-wrap{position:relative;display:inline-block;}
-  .photo-preview{max-width:100%;max-height:220px;border-radius:10px;display:block;border:1px solid var(--line);}
-  .photo-remove{
-    position:absolute;top:8px;right:8px;background:rgba(43,33,25,0.7);color:#fff;border:none;
-    border-radius:999px;width:26px;height:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  .photo-add-tile{
+    width:96px;height:96px;border:1px dashed var(--line-strong);border-radius:10px;flex-shrink:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;
+    color:var(--ink-soft);font-size:11px;gap:4px;background:var(--paper);
   }
-  .photo-hint{font-size:12px;color:var(--ink-soft);margin-top:6px;}
+  .photo-add-tile:hover{border-color:var(--gold);}
+  .photo-hint{font-size:12px;color:var(--ink-soft);margin-top:8px;}
 
   .mold-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
   .mold-row{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:var(--paper);}
@@ -224,6 +244,8 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" id="searchInput" placeholder="搜尋蛋糕名稱、標籤或筆記內容">
     </div>
+    <input type="file" id="importFile" accept="application/json" style="display:none;">
+    <button class="btn-ghost" id="importBtn">匯入紀錄</button>
     <button class="btn-ghost" id="apiSettingsBtn">API 設定<span class="key-dot off" id="keyDot"></span></button>
     <button class="btn-ghost" id="moldSettingsBtn">模具設定檔</button>
     <button class="btn-add" id="addBtn">+ 新增紀錄</button>
@@ -286,11 +308,12 @@
       </div>
       <div class="field">
         <div class="field-label-row">
-          <label>原始食材與份量（貼上影片食譜文字）</label>
+          <label>原始食材與份量（貼上影片食譜文字，或直接寫 Markdown 表格）</label>
           <button type="button" class="mini-btn" id="aiConvertBtn">AI 轉換為表格</button>
         </div>
         <textarea id="in-srcIngredients" placeholder="貼上影片食譜內容，可點右上角「AI 轉換為表格」自動整理成 Markdown 表格"></textarea>
         <p class="field-hint" id="aiStatusHint"></p>
+        <div class="md-preview" id="srcPreview"></div>
       </div>
     </fieldset>
 
@@ -321,13 +344,15 @@
           <button type="button" class="mini-btn" id="recalcBtn">依倍率重新計算</button>
         </div>
         <textarea id="in-myIngredients" placeholder="點左上角「依倍率重新計算」可依原始表格與換算倍率自動產生"></textarea>
+        <div class="md-preview" id="myPreview"></div>
       </div>
     </fieldset>
 
     <fieldset>
-      <legend>成品照片（選填）</legend>
-      <input type="file" id="in-photoFile" accept="image/*" style="display:none;">
-      <div id="photoArea"></div>
+      <legend>成品照片（選填，可上傳多張）</legend>
+      <input type="file" id="in-photoFile" accept="image/*" multiple style="display:none;">
+      <div class="photo-grid" id="photoArea"></div>
+      <p class="photo-hint">照片會壓縮後存在這台瀏覽器裡（localStorage），換裝置不會同步，張數太多可能會佔滿本機儲存空間。</p>
     </fieldset>
 
     <fieldset>
@@ -355,7 +380,10 @@
     </fieldset>
 
     <div class="modal-footer">
-      <button class="btn-danger" id="deleteBtn" style="display:none;">刪除這筆紀錄</button>
+      <div class="footer-left">
+        <button class="btn-danger" id="deleteBtn" style="display:none;">刪除這筆紀錄</button>
+        <button class="mini-btn" id="exportBtn" style="display:none;">匯出此紀錄</button>
+      </div>
       <div style="flex:1;"></div>
       <button class="btn-primary" id="saveBtn">儲存紀錄</button>
     </div>
@@ -443,7 +471,7 @@ let molds = [];
 let editingId = null;
 let editingMoldId = null;
 let pickedOutcome = '';
-let currentPhoto = '';
+let currentPhotos = [];
 
 const grid = document.getElementById('grid');
 const countLine = document.getElementById('countLine');
@@ -461,6 +489,9 @@ function roundAmt(n){
   if(Math.abs(n) >= 10) return Math.round(n * 10) / 10;
   return Math.round(n * 100) / 100;
 }
+function sanitizeFilename(s){
+  return (s || 'recipe').replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 60) || 'recipe';
+}
 
 /* ---------- storage (localStorage, standalone static site) ---------- */
 function lsGet(key){
@@ -473,6 +504,9 @@ function lsSet(key, value){
 }
 async function loadAll(){
   entries = lsGet(LS_ENTRIES) || [];
+  entries.forEach(e=>{
+    if(!e.photos){ e.photos = e.photo ? [e.photo] : []; }
+  });
   molds = lsGet(LS_MOLDS) || [];
   render();
   renderMoldSelect();
@@ -653,7 +687,7 @@ function recomputeRatio(){
   }
 }
 
-/* ---------- markdown table parse/build ---------- */
+/* ---------- markdown table parse/build/render ---------- */
 function buildMarkdownTable(items){
   let md = '| 食材 | 份量 | 單位 |\n|---|---|---|\n';
   items.forEach(it => {
@@ -674,6 +708,21 @@ function parseMarkdownTable(text){
     items.push({ name: cells[0], amount: isNaN(amountNum) ? cells[1] : amountNum, unit: cells[2] || '' });
   });
   return items;
+}
+function renderMdPreview(textareaId, previewId){
+  const text = document.getElementById(textareaId).value;
+  const items = parseMarkdownTable(text);
+  const el = document.getElementById(previewId);
+  if(items.length === 0){
+    el.innerHTML = text.trim() ? '<p class="empty-note">目前內容還不是可辨識的表格格式，會以純文字儲存。</p>' : '<p class="empty-note">表格預覽會顯示在這裡。</p>';
+    return;
+  }
+  let html = '<table><thead><tr><th>食材</th><th>份量</th><th>單位</th></tr></thead><tbody>';
+  items.forEach(it => {
+    html += `<tr><td>${escapeHtml(it.name)}</td><td>${escapeHtml(it.amount)}</td><td>${escapeHtml(it.unit)}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
 }
 
 /* ---------- AI conversion (direct browser call, needs user's own key) ---------- */
@@ -729,6 +778,7 @@ async function handleAiConvert(){
     const items = Array.isArray(result.items) ? result.items : [];
     if(items.length === 0) throw new Error('EMPTY');
     document.getElementById('in-srcIngredients').value = buildMarkdownTable(items);
+    renderMdPreview('in-srcIngredients', 'srcPreview');
     if(result.sourceContainer && !document.getElementById('in-srcContainer').value.trim()){
       document.getElementById('in-srcContainer').value = result.sourceContainer;
     }
@@ -761,9 +811,10 @@ function recalcScaledTable(){
     unit: it.unit
   }));
   document.getElementById('in-myIngredients').value = buildMarkdownTable(scaled);
+  renderMdPreview('in-myIngredients', 'myPreview');
 }
 
-/* ---------- photo ---------- */
+/* ---------- photos (multiple) ---------- */
 function compressImage(file){
   return new Promise((resolve, reject)=>{
     const reader = new FileReader();
@@ -790,25 +841,30 @@ function compressImage(file){
 }
 function renderPhotoArea(){
   const area = document.getElementById('photoArea');
-  if(currentPhoto){
-    area.innerHTML = `
-      <div class="photo-preview-wrap">
-        <img class="photo-preview" src="${currentPhoto}">
-        <button type="button" class="photo-remove" id="photoRemoveBtn" aria-label="移除照片">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>`;
-    document.getElementById('photoRemoveBtn').addEventListener('click', (ev)=>{
-      ev.stopPropagation(); currentPhoto = ''; renderPhotoArea();
+  let html = currentPhotos.map((p, idx) => `
+    <div class="photo-thumb-wrap">
+      <img class="photo-thumb" src="${p}">
+      <button type="button" class="photo-thumb-remove" data-idx="${idx}" aria-label="移除照片">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>`).join('');
+  html += `
+    <div class="photo-add-tile" id="photoAddTile">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <span>新增照片</span>
+    </div>`;
+  area.innerHTML = html;
+  document.getElementById('photoAddTile').addEventListener('click', ()=>{
+    document.getElementById('in-photoFile').click();
+  });
+  area.querySelectorAll('.photo-thumb-remove').forEach(btn=>{
+    btn.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      const idx = Number(btn.dataset.idx);
+      currentPhotos.splice(idx, 1);
+      renderPhotoArea();
     });
-  } else {
-    area.innerHTML = `
-      <div class="photo-upload" id="photoUploadTrigger">點此選擇照片，或拍照上傳</div>
-      <p class="photo-hint">照片會壓縮後存在這台瀏覽器裡（localStorage），換裝置不會同步。</p>`;
-    document.getElementById('photoUploadTrigger').addEventListener('click', ()=>{
-      document.getElementById('in-photoFile').click();
-    });
-  }
+  });
 }
 
 /* ---------- entries render ---------- */
@@ -838,9 +894,15 @@ function render(){
   grid.innerHTML = filtered.map(e => {
     const outcomeClass = 'outcome-' + (e.outcome || 'okay');
     const tagsHtml = (e.tags||[]).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('');
+    const photos = e.photos || (e.photo ? [e.photo] : []);
+    const photoHtml = photos.length ? `
+      <div class="card-photo-wrap">
+        <img class="card-photo" src="${photos[0]}">
+        ${photos.length > 1 ? `<span class="card-photo-badge">+${photos.length - 1}</span>` : ''}
+      </div>` : '';
     return `
       <div class="card ${outcomeClass}" onclick="openModal('${e.id}')">
-        ${e.photo ? `<img class="card-photo" src="${e.photo}">` : ''}
+        ${photoHtml}
         <div class="card-top">
           <div>
             <p class="card-title">${escapeHtml(e.title || '未命名')}</p>
@@ -868,10 +930,13 @@ function clearForm(){
   document.getElementById('in-myContainerSelect').value = '';
   document.getElementById('aiStatusHint').textContent = '';
   pickedOutcome = '';
-  currentPhoto = '';
+  currentPhotos = [];
   renderPhotoArea();
   updateOutcomePicker();
+  renderMdPreview('in-srcIngredients', 'srcPreview');
+  renderMdPreview('in-myIngredients', 'myPreview');
   document.getElementById('f-title').classList.remove('invalid');
+  document.getElementById('exportBtn').style.display = 'none';
 }
 function fillForm(e){
   document.getElementById('in-title').value = e.title || '';
@@ -891,9 +956,12 @@ function fillForm(e){
   document.getElementById('in-tags').value = (e.tags||[]).join(', ');
   document.getElementById('aiStatusHint').textContent = '';
   pickedOutcome = e.outcome || '';
-  currentPhoto = e.photo || '';
+  currentPhotos = (e.photos || (e.photo ? [e.photo] : [])).slice();
   renderPhotoArea();
   updateOutcomePicker();
+  renderMdPreview('in-srcIngredients', 'srcPreview');
+  renderMdPreview('in-myIngredients', 'myPreview');
+  document.getElementById('exportBtn').style.display = 'inline-block';
 }
 function updateOutcomePicker(){
   document.querySelectorAll('.outcome-opt').forEach(el=>{
@@ -916,6 +984,35 @@ function openModal(id){
     deleteBtn.style.display = 'none';
   }
   overlay.classList.add('open');
+}
+function openModalWithImportedData(data){
+  editingId = null;
+  document.getElementById('modalTitle').textContent = '匯入的紀錄（確認後儲存）';
+  clearForm();
+  document.getElementById('in-title').value = data.title || '';
+  document.getElementById('in-date').value = data.date || new Date().toISOString().slice(0,10);
+  document.getElementById('in-videoUrl').value = data.videoUrl || '';
+  document.getElementById('in-videoNote').value = data.videoNote || '';
+  document.getElementById('in-srcContainer').value = data.srcContainer || '';
+  document.getElementById('in-srcVolume').value = data.srcVolume || '';
+  document.getElementById('in-srcTime').value = data.srcTime || '';
+  document.getElementById('in-srcIngredients').value = data.srcIngredients || '';
+  document.getElementById('in-scaleRatio').value = data.scaleRatio || '';
+  document.getElementById('in-myTime').value = data.myTime || '';
+  document.getElementById('in-myIngredients').value = data.myIngredients || '';
+  document.getElementById('in-resultNotes').value = data.resultNotes || '';
+  document.getElementById('in-nextTime').value = data.nextTime || '';
+  document.getElementById('in-tags').value = (data.tags||[]).join(', ');
+  pickedOutcome = data.outcome || '';
+  currentPhotos = (data.photos || (data.photo ? [data.photo] : [])).slice();
+  renderPhotoArea();
+  updateOutcomePicker();
+  renderMdPreview('in-srcIngredients', 'srcPreview');
+  renderMdPreview('in-myIngredients', 'myPreview');
+  document.getElementById('deleteBtn').style.display = 'none';
+  document.getElementById('exportBtn').style.display = 'none';
+  overlay.classList.add('open');
+  statusLine.textContent = '匯入的內容尚未儲存，確認無誤後請按「儲存紀錄」（模具容器需重新選擇）';
 }
 function closeModal(){ overlay.classList.remove('open'); editingId = null; }
 
@@ -950,7 +1047,7 @@ async function saveEntry(){
     nextTime: document.getElementById('in-nextTime').value.trim(),
     tags,
     outcome: pickedOutcome,
-    photo: currentPhoto
+    photos: currentPhotos.slice()
   };
 
   if(editingId){
@@ -981,11 +1078,55 @@ async function deleteEntry(){
   }
 }
 
+/* ---------- export / import single entry ---------- */
+function downloadJSON(obj, filename){
+  const blob = new Blob([JSON.stringify(obj, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function exportCurrentEntry(){
+  if(!editingId) return;
+  const e = entries.find(x => x.id === editingId);
+  if(!e) return;
+  downloadJSON(e, `${sanitizeFilename(e.title)}_${e.date || ''}.json`);
+}
+function handleImportFile(ev){
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const data = JSON.parse(reader.result);
+      if(!data || typeof data !== 'object' || Array.isArray(data)){
+        throw new Error('格式不正確');
+      }
+      if(!data.title){
+        statusLine.textContent = '這個檔案看起來不是有效的紀錄（缺少名稱）';
+        return;
+      }
+      openModalWithImportedData(data);
+    }catch(e){
+      statusLine.textContent = '匯入失敗，請確認是先前匯出的 JSON 檔案';
+      setTimeout(()=>{ if(statusLine.textContent==='匯入失敗，請確認是先前匯出的 JSON 檔案') statusLine.textContent=''; }, 2500);
+    }
+  };
+  reader.onerror = () => { statusLine.textContent = '讀取檔案失敗'; };
+  reader.readAsText(file);
+}
+
 /* ---------- events ---------- */
 document.getElementById('addBtn').addEventListener('click', ()=>openModal());
 document.getElementById('closeBtn').addEventListener('click', closeModal);
 document.getElementById('saveBtn').addEventListener('click', saveEntry);
 document.getElementById('deleteBtn').addEventListener('click', deleteEntry);
+document.getElementById('exportBtn').addEventListener('click', exportCurrentEntry);
 document.getElementById('outcomePicker').addEventListener('click', (ev)=>{
   const opt = ev.target.closest('.outcome-opt');
   if(!opt) return;
@@ -995,24 +1136,34 @@ document.getElementById('outcomePicker').addEventListener('click', (ev)=>{
 overlay.addEventListener('click', (ev)=>{ if(ev.target === overlay) closeModal(); });
 searchInput.addEventListener('input', render);
 
+document.getElementById('importBtn').addEventListener('click', ()=>{
+  document.getElementById('importFile').click();
+});
+document.getElementById('importFile').addEventListener('change', handleImportFile);
+
 document.getElementById('in-photoFile').addEventListener('change', async (ev)=>{
-  const file = ev.target.files && ev.target.files[0];
+  const files = Array.from(ev.target.files || []);
   ev.target.value = '';
-  if(!file) return;
+  if(files.length === 0) return;
   statusLine.textContent = '處理照片中…';
-  try{
-    currentPhoto = await compressImage(file);
-    renderPhotoArea();
-    statusLine.textContent = '';
-  }catch(err){
-    statusLine.textContent = '照片處理失敗，請換一張試試';
+  for(const file of files){
+    try{
+      const compressed = await compressImage(file);
+      currentPhotos.push(compressed);
+    }catch(err){
+      statusLine.textContent = '有一張照片處理失敗，已略過';
+    }
   }
+  renderPhotoArea();
+  if(statusLine.textContent === '處理照片中…') statusLine.textContent = '';
 });
 
 document.getElementById('in-myContainerSelect').addEventListener('change', recomputeRatio);
 document.getElementById('in-srcVolume').addEventListener('input', recomputeRatio);
 document.getElementById('aiConvertBtn').addEventListener('click', handleAiConvert);
 document.getElementById('recalcBtn').addEventListener('click', recalcScaledTable);
+document.getElementById('in-srcIngredients').addEventListener('input', ()=>renderMdPreview('in-srcIngredients','srcPreview'));
+document.getElementById('in-myIngredients').addEventListener('input', ()=>renderMdPreview('in-myIngredients','myPreview'));
 
 document.getElementById('moldSettingsBtn').addEventListener('click', openMoldSettings);
 document.getElementById('manageMoldFromForm').addEventListener('click', openMoldSettings);
