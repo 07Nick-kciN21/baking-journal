@@ -1,11 +1,11 @@
 # 烘焙修正筆記本
 
-單一檔案（`index.html`）的靜態網頁工具，記錄每次做蛋糕時如何從影片食譜換算容器與時間、成果如何、下次要改什麼。
+純前端靜態網頁工具（`index.html` + `style.css` + `script.js`），記錄每次做蛋糕時如何從影片食譜換算容器與時間、成果如何、下次要改什麼。
 
 ## 部署到 GitHub Pages
 
 1. 建一個新的 GitHub repository（public 或 private 皆可，若用 GitHub 免費方案的 Pages 功能，private repo 也能開啟 Pages）。
-2. 把 `index.html` 上傳到 repo 根目錄（檔名一定要是 `index.html`）。
+2. 把 `index.html`、`style.css`、`script.js` 一起上傳到 repo 根目錄（`index.html` 檔名不能改，另外兩個檔名要跟 `index.html` 裡的引用一致）。
 3. 到 repo 的 **Settings → Pages**，Source 選擇 `Deploy from a branch`，Branch 選 `main` / `/ (root)`，儲存。
 4. 等一兩分鐘，GitHub 會給你一個網址，格式通常是：
    `https://<你的帳號>.github.io/<repo名稱>/`
