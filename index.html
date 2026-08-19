@@ -46,14 +46,10 @@
     <fieldset>
       <legend>基本資訊</legend>
       <div class="row">
-        <div class="field" style="flex:2" id="f-title">
+        <div class="field" id="f-title">
           <label>蛋糕名稱</label>
           <input type="text" id="in-title" placeholder="例如：巴斯克乳酪蛋糕">
           <span class="err">請輸入名稱</span>
-        </div>
-        <div class="field" id="f-date">
-          <label>製作日期</label>
-          <input type="date" id="in-date">
         </div>
       </div>
       <div class="row">
@@ -65,6 +61,10 @@
           <label>影片作者／來源（選填）</label>
           <input type="text" id="in-videoNote" placeholder="例如：某某烘焙頻道">
         </div>
+      </div>
+      <div class="field">
+        <label>標籤（用逗號分隔）</label>
+        <input type="text" id="in-tags" placeholder="例如：乳酪蛋糕, 8吋, 需改進">
       </div>
     </fieldset>
 
@@ -95,65 +95,70 @@
       </div>
     </fieldset>
 
-    <fieldset>
-      <legend>我實際的調整</legend>
-      <div class="row">
-        <div class="field">
-          <div class="field-label-row">
-            <label>我用的容器</label>
-            <button type="button" class="mini-btn" id="manageMoldFromForm">管理模具</button>
+    <fieldset id="attemptsFieldset" style="display:none;">
+      <legend>調整紀錄</legend>
+      <div class="attempts-list" id="attemptsList"></div>
+      <button type="button" class="mini-btn" id="addAttemptBtn">+ 新增一次調整記錄</button>
+
+      <div class="attempt-form" id="attemptForm" style="display:none;">
+        <p class="attempt-form-title" id="attemptFormTitle">新增一次調整記錄</p>
+        <div class="row">
+          <div class="field">
+            <label>製作日期</label>
+            <input type="date" id="in-att-date">
           </div>
-          <select id="in-myContainerSelect">
-            <option value="">— 選擇模具 —</option>
-          </select>
+          <div class="field">
+            <div class="field-label-row">
+              <label>我用的容器</label>
+              <button type="button" class="mini-btn" id="manageMoldFromAttempt">管理模具</button>
+            </div>
+            <select id="in-att-containerSelect">
+              <option value="">— 選擇模具 —</option>
+            </select>
+          </div>
         </div>
-        <div class="field">
+        <div class="field" style="margin-bottom:12px;">
           <label>換算倍率（自動計算，可手動修改）</label>
-          <input type="number" id="in-scaleRatio" step="0.01" min="0" placeholder="1.0">
+          <input type="number" id="in-att-scaleRatio" step="0.01" min="0" placeholder="1.0">
         </div>
-      </div>
-      <div class="field" style="margin-bottom:12px;">
-        <label>實際烘烤溫度／時間</label>
-        <input type="text" id="in-myTime" placeholder="例如：170°C／45分鐘">
-      </div>
-      <div class="field">
-        <div class="field-label-row">
-          <label>換算後的食材與份量</label>
-          <button type="button" class="mini-btn" id="recalcBtn">依倍率重新計算</button>
+        <div class="field" style="margin-bottom:12px;">
+          <label>實際烘烤溫度／時間</label>
+          <input type="text" id="in-att-myTime" placeholder="例如：170°C／45分鐘">
         </div>
-        <textarea id="in-myIngredients" placeholder="點左上角「依倍率重新計算」可依原始表格與換算倍率自動產生"></textarea>
-        <div class="md-preview" id="myPreview"></div>
-      </div>
-    </fieldset>
-
-    <fieldset>
-      <legend>成品照片（選填，可上傳多張）</legend>
-      <input type="file" id="in-photoFile" accept="image/*" multiple style="display:none;">
-      <div class="photo-grid" id="photoArea"></div>
-      <p class="photo-hint">照片會壓縮後存在這台瀏覽器裡（localStorage），換裝置不會同步，張數太多可能會佔滿本機儲存空間。</p>
-    </fieldset>
-
-    <fieldset>
-      <legend>成果</legend>
-      <div class="field" id="f-outcome" style="margin-bottom:12px;">
-        <label>整體結果</label>
-        <div class="outcome-picker" id="outcomePicker">
-          <div class="outcome-opt" data-val="success">成功</div>
-          <div class="outcome-opt" data-val="okay">尚可，需微調</div>
-          <div class="outcome-opt" data-val="fail">失敗</div>
+        <div class="field" style="margin-bottom:12px;">
+          <div class="field-label-row">
+            <label>換算後的食材與份量</label>
+            <button type="button" class="mini-btn" id="attRecalcBtn">依倍率重新計算</button>
+          </div>
+          <textarea id="in-att-myIngredients" placeholder="點左上角「依倍率重新計算」可依原始表格與換算倍率自動產生"></textarea>
+          <div class="md-preview" id="attPreview"></div>
         </div>
-      </div>
-      <div class="field" style="margin-bottom:12px;">
-        <label>成果描述</label>
-        <textarea id="in-resultNotes" placeholder="例如：中心稍微濕黏、邊緣有點焦"></textarea>
-      </div>
-      <div class="field" style="margin-bottom:12px;">
-        <label>下次要調整的地方（最重要）</label>
-        <textarea id="in-nextTime" placeholder="例如：降溫10度、多烤5分鐘、份量再減少一成"></textarea>
-      </div>
-      <div class="field">
-        <label>標籤（用逗號分隔）</label>
-        <input type="text" id="in-tags" placeholder="例如：乳酪蛋糕, 8吋, 需改進">
+        <div class="field" style="margin-bottom:12px;">
+          <label>成品照片（選填，可上傳多張）</label>
+          <input type="file" id="in-att-photoFile" accept="image/*" multiple style="display:none;">
+          <div class="photo-grid" id="attPhotoArea"></div>
+          <p class="photo-hint">照片會壓縮後存在這台瀏覽器裡（localStorage），換裝置不會同步，張數太多可能會佔滿本機儲存空間。</p>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>整體結果</label>
+          <div class="outcome-picker" id="attOutcomePicker">
+            <div class="outcome-opt" data-val="success">成功</div>
+            <div class="outcome-opt" data-val="okay">尚可，需微調</div>
+            <div class="outcome-opt" data-val="fail">失敗</div>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>成果描述</label>
+          <textarea id="in-att-resultNotes" placeholder="例如：中心稍微濕黏、邊緣有點焦"></textarea>
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label>下次要調整的地方（最重要）</label>
+          <textarea id="in-att-nextTime" placeholder="例如：降溫10度、多烤5分鐘、份量再減少一成"></textarea>
+        </div>
+        <div class="attempt-form-actions">
+          <button type="button" class="btn-danger" id="cancelAttemptBtn">取消</button>
+          <button type="button" class="btn-primary" id="saveAttemptBtn">儲存這筆調整記錄</button>
+        </div>
       </div>
     </fieldset>
 

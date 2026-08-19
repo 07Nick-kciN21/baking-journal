@@ -5,8 +5,10 @@ let entries = [];
 let molds = [];
 let editingId = null;
 let editingMoldId = null;
-let pickedOutcome = '';
-let currentPhotos = [];
+let editingAttemptId = null;
+let attemptPickedOutcome = '';
+let currentAttemptPhotos = [];
+let expandedAttemptIds = new Set();
 let lastAutoSyncedTime = '';
 
 const grid = document.getElementById('grid');
@@ -38,15 +40,48 @@ function lsSet(key, value){
   try{ localStorage.setItem(key, JSON.stringify(value)); return true; }
   catch(e){ return false; }
 }
+function migrateEntry(e){
+  if(!e.attempts){
+    const hasAttemptData = e.date || e.myContainerId || e.myTime || e.myIngredients ||
+      e.resultNotes || e.nextTime || e.outcome || (e.photos && e.photos.length) || e.photo;
+    const attempt = {
+      id: uid('att'),
+      date: e.date || '',
+      myContainerId: e.myContainerId || '',
+      myContainerLabel: e.myContainerLabel || '',
+      myVolume: e.myVolume != null ? e.myVolume : null,
+      scaleRatio: e.scaleRatio != null ? e.scaleRatio : null,
+      myTime: e.myTime || '',
+      myIngredients: e.myIngredients || '',
+      resultNotes: e.resultNotes || '',
+      nextTime: e.nextTime || '',
+      outcome: e.outcome || '',
+      photos: e.photos || (e.photo ? [e.photo] : []),
+      createdAt: e.date ? (new Date(e.date).getTime() || Date.now()) : Date.now()
+    };
+    e.attempts = hasAttemptData ? [attempt] : [];
+  }
+  delete e.date; delete e.myContainerId; delete e.myContainerLabel; delete e.myVolume;
+  delete e.scaleRatio; delete e.myTime; delete e.myIngredients; delete e.resultNotes;
+  delete e.nextTime; delete e.outcome; delete e.photos; delete e.photo;
+  if(e.createdAt == null){
+    e.createdAt = e.attempts.length ? Math.min(...e.attempts.map(a=>a.createdAt||Date.now())) : Date.now();
+  }
+  if(e.updatedAt == null){
+    e.updatedAt = e.attempts.length ? Math.max(...e.attempts.map(a=>a.createdAt||0)) : e.createdAt;
+  }
+}
 async function loadAll(){
   entries = lsGet(LS_ENTRIES) || [];
+  let migrated = false;
   entries.forEach(e=>{
-    if(!e.photos){ e.photos = e.photo ? [e.photo] : []; }
+    if(!e.attempts || e.updatedAt == null || e.createdAt == null){ migrateEntry(e); migrated = true; }
   });
   molds = lsGet(LS_MOLDS) || [];
   render();
   renderMoldSelect();
   updateKeyDot();
+  if(migrated) await persistEntries();
 }
 async function persistEntries(){ return lsSet(LS_ENTRIES, entries); }
 async function persistMolds(){ return lsSet(LS_MOLDS, molds); }
@@ -123,7 +158,7 @@ function renderMoldList(){
     </div>`).join('');
 }
 function renderMoldSelect(){
-  const sel = document.getElementById('in-myContainerSelect');
+  const sel = document.getElementById('in-att-containerSelect');
   const current = sel.value;
   sel.innerHTML = '<option value="">— 選擇模具 —</option>' +
     molds.map(m => `<option value="${m.id}">${escapeHtml(m.name)}（約${Math.round(moldVolume(m))}ml）</option>`).join('');
@@ -215,11 +250,11 @@ function closeMoldSettings(){ moldOverlay.classList.remove('open'); }
 /* ---------- ratio ---------- */
 function recomputeRatio(){
   const srcVol = Number(document.getElementById('in-srcVolume').value);
-  const moldId = document.getElementById('in-myContainerSelect').value;
+  const moldId = document.getElementById('in-att-containerSelect').value;
   const m = molds.find(x => x.id === moldId);
   if(srcVol > 0 && m){
     const myVol = moldVolume(m);
-    if(myVol > 0) document.getElementById('in-scaleRatio').value = roundAmt(myVol / srcVol);
+    if(myVol > 0) document.getElementById('in-att-scaleRatio').value = roundAmt(myVol / srcVol);
   }
 }
 
@@ -322,7 +357,6 @@ async function handleAiConvert(){
       document.getElementById('in-srcTime').value = result.sourceTime;
     }
     hint.textContent = '已轉換成表格';
-    recalcScaledTable();
   }catch(e){
     hint.className = 'field-hint warn';
     if(e.message === 'BAD_KEY') hint.textContent = 'API key 無效或已過期，請到「API 設定」重新輸入';
@@ -340,17 +374,17 @@ function recalcScaledTable(){
     setTimeout(()=>{ if(statusLine.textContent==='目前原始食材欄位還沒有可辨識的表格內容') statusLine.textContent=''; }, 2000);
     return;
   }
-  const ratio = Number(document.getElementById('in-scaleRatio').value) || 1;
+  const ratio = Number(document.getElementById('in-att-scaleRatio').value) || 1;
   const scaled = items.map(it => ({
     name: it.name,
     amount: typeof it.amount === 'number' ? roundAmt(it.amount * ratio) : it.amount,
     unit: it.unit
   }));
-  document.getElementById('in-myIngredients').value = buildMarkdownTable(scaled);
-  renderMdPreview('in-myIngredients', 'myPreview');
+  document.getElementById('in-att-myIngredients').value = buildMarkdownTable(scaled);
+  renderMdPreview('in-att-myIngredients', 'attPreview');
 }
 
-/* ---------- photos (multiple) ---------- */
+/* ---------- photos (multiple, per attempt) ---------- */
 function compressImage(file){
   return new Promise((resolve, reject)=>{
     const reader = new FileReader();
@@ -375,9 +409,9 @@ function compressImage(file){
     reader.readAsDataURL(file);
   });
 }
-function renderPhotoArea(){
-  const area = document.getElementById('photoArea');
-  let html = currentPhotos.map((p, idx) => `
+function renderAttemptPhotoArea(){
+  const area = document.getElementById('attPhotoArea');
+  let html = currentAttemptPhotos.map((p, idx) => `
     <div class="photo-thumb-wrap">
       <img class="photo-thumb" src="${p}">
       <button type="button" class="photo-thumb-remove" data-idx="${idx}" aria-label="移除照片">
@@ -385,34 +419,39 @@ function renderPhotoArea(){
       </button>
     </div>`).join('');
   html += `
-    <div class="photo-add-tile" id="photoAddTile">
+    <div class="photo-add-tile" id="attPhotoAddTile">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       <span>新增照片</span>
     </div>`;
   area.innerHTML = html;
-  document.getElementById('photoAddTile').addEventListener('click', ()=>{
-    document.getElementById('in-photoFile').click();
+  document.getElementById('attPhotoAddTile').addEventListener('click', ()=>{
+    document.getElementById('in-att-photoFile').click();
   });
   area.querySelectorAll('.photo-thumb-remove').forEach(btn=>{
     btn.addEventListener('click', (ev)=>{
       ev.stopPropagation();
       const idx = Number(btn.dataset.idx);
-      currentPhotos.splice(idx, 1);
-      renderPhotoArea();
+      currentAttemptPhotos.splice(idx, 1);
+      renderAttemptPhotoArea();
     });
   });
 }
 
-/* ---------- entries render ---------- */
+/* ---------- entries render (top-level cards) ---------- */
+function latestAttempt(entry){
+  const atts = entry.attempts || [];
+  return atts.length ? atts[atts.length - 1] : null;
+}
 function matchesSearch(entry, q){
   if(!q) return true;
   q = q.toLowerCase();
-  const hay = [entry.title, entry.videoNote, entry.resultNotes, entry.nextTime, (entry.tags||[]).join(' ')].join(' ').toLowerCase();
+  const attemptText = (entry.attempts||[]).map(a => [a.resultNotes, a.nextTime, a.myTime, a.myIngredients].join(' ')).join(' ');
+  const hay = [entry.title, entry.videoNote, entry.srcContainer, attemptText, (entry.tags||[]).join(' ')].join(' ').toLowerCase();
   return hay.includes(q);
 }
 function render(){
   const q = searchInput.value.trim();
-  const filtered = entries.filter(e => matchesSearch(e, q)).sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  const filtered = entries.filter(e => matchesSearch(e, q)).sort((a,b) => (b.updatedAt||0) - (a.updatedAt||0));
   countLine.textContent = entries.length === 0 ? '' : `共 ${entries.length} 筆紀錄${q ? '，符合搜尋 ' + filtered.length + ' 筆' : ''}`;
   if(entries.length === 0){
     grid.innerHTML = `
@@ -428,14 +467,16 @@ function render(){
     return;
   }
   grid.innerHTML = filtered.map(e => {
-    const outcomeClass = 'outcome-' + (e.outcome || 'okay');
+    const latest = latestAttempt(e);
+    const outcomeClass = 'outcome-' + (latest ? (latest.outcome || 'okay') : 'none');
     const tagsHtml = (e.tags||[]).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('');
-    const photos = e.photos || (e.photo ? [e.photo] : []);
+    const photos = latest ? (latest.photos || []) : [];
     const photoHtml = photos.length ? `
       <div class="card-photo-wrap">
         <img class="card-photo" src="${photos[0]}">
         ${photos.length > 1 ? `<span class="card-photo-badge">+${photos.length - 1}</span>` : ''}
       </div>` : '';
+    const attemptCount = (e.attempts||[]).length;
     return `
       <div class="card ${outcomeClass}" onclick="openModal('${e.id}')">
         ${photoHtml}
@@ -443,129 +484,254 @@ function render(){
           <div>
             <p class="card-title">${escapeHtml(e.title || '未命名')}</p>
             <div class="card-meta">
-              <span>${escapeHtml(e.date || '')}</span>
-              ${e.myContainerLabel ? '<span>' + escapeHtml(e.myContainerLabel) + '</span>' : ''}
-              ${e.myTime ? '<span>' + escapeHtml(e.myTime) + '</span>' : ''}
+              ${latest && latest.date ? '<span>' + escapeHtml(latest.date) + '</span>' : ''}
+              ${latest && latest.myContainerLabel ? '<span>' + escapeHtml(latest.myContainerLabel) + '</span>' : ''}
+              ${latest && latest.myTime ? '<span>' + escapeHtml(latest.myTime) + '</span>' : ''}
+              <span class="attempt-count">共 ${attemptCount} 次調整</span>
             </div>
           </div>
-          <span class="stamp ${outcomeClass}">${outcomeLabel(e.outcome)}</span>
+          <span class="stamp ${outcomeClass}">${latest ? outcomeLabel(latest.outcome) : '尚無調整記錄'}</span>
         </div>
-        ${e.nextTime ? `<div class="card-next"><span class="label">下次調整</span>${escapeHtml(e.nextTime)}</div>` : ''}
+        ${latest && latest.nextTime ? `<div class="card-next"><span class="label">下次調整</span>${escapeHtml(latest.nextTime)}</div>` : ''}
         ${tagsHtml ? `<div class="tags">${tagsHtml}</div>` : ''}
       </div>`;
   }).join('');
 }
 
-/* ---------- entry form ---------- */
+/* ---------- attempt sub-form (each bake attempt under an entry) ---------- */
 function resetTimeSyncTracking(){
-  const v = document.getElementById('in-myTime').value;
+  const v = document.getElementById('in-att-myTime').value;
   lastAutoSyncedTime = v === '' ? '' : null;
 }
 function syncMyTimeFromSrc(){
-  const myTimeEl = document.getElementById('in-myTime');
+  const myTimeEl = document.getElementById('in-att-myTime');
   if(myTimeEl.value === '' || myTimeEl.value === lastAutoSyncedTime){
     const val = document.getElementById('in-srcTime').value;
     myTimeEl.value = val;
     lastAutoSyncedTime = val;
   }
 }
-function clearForm(){
-  ['title','videoUrl','videoNote','srcContainer','srcVolume','srcTime','srcIngredients',
-   'myTime','myIngredients','resultNotes','nextTime','tags','scaleRatio'].forEach(k=>{
+function updateAttemptOutcomePicker(){
+  document.querySelectorAll('#attOutcomePicker .outcome-opt').forEach(el=>{
+    el.className = 'outcome-opt' + (el.dataset.val === attemptPickedOutcome ? ' picked-' + attemptPickedOutcome : '');
+  });
+}
+function clearAttemptForm(){
+  ['att-date','att-scaleRatio','att-myTime','att-myIngredients','att-resultNotes','att-nextTime'].forEach(k=>{
     document.getElementById('in-'+k).value = '';
   });
-  document.getElementById('in-date').value = new Date().toISOString().slice(0,10);
-  document.getElementById('in-myContainerSelect').value = '';
-  document.getElementById('aiStatusHint').textContent = '';
+  document.getElementById('in-att-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('in-att-containerSelect').value = '';
+  attemptPickedOutcome = '';
+  currentAttemptPhotos = [];
+  editingAttemptId = null;
   resetTimeSyncTracking();
-  pickedOutcome = '';
-  currentPhotos = [];
-  renderPhotoArea();
-  updateOutcomePicker();
+  renderAttemptPhotoArea();
+  updateAttemptOutcomePicker();
+  renderMdPreview('in-att-myIngredients', 'attPreview');
+  document.getElementById('attemptFormTitle').textContent = '新增一次調整記錄';
+  document.getElementById('saveAttemptBtn').textContent = '儲存這筆調整記錄';
+}
+function fillAttemptForm(a){
+  document.getElementById('in-att-date').value = a.date || '';
+  document.getElementById('in-att-containerSelect').value = a.myContainerId || '';
+  document.getElementById('in-att-scaleRatio').value = a.scaleRatio == null ? '' : a.scaleRatio;
+  document.getElementById('in-att-myTime').value = a.myTime || '';
+  resetTimeSyncTracking();
+  document.getElementById('in-att-myIngredients').value = a.myIngredients || '';
+  document.getElementById('in-att-resultNotes').value = a.resultNotes || '';
+  document.getElementById('in-att-nextTime').value = a.nextTime || '';
+  attemptPickedOutcome = a.outcome || '';
+  currentAttemptPhotos = (a.photos || []).slice();
+  editingAttemptId = a.id;
+  renderAttemptPhotoArea();
+  updateAttemptOutcomePicker();
+  renderMdPreview('in-att-myIngredients', 'attPreview');
+  document.getElementById('attemptFormTitle').textContent = '編輯這筆調整記錄';
+  document.getElementById('saveAttemptBtn').textContent = '儲存變更';
+}
+function showAttemptForm(){
+  document.getElementById('attemptForm').style.display = '';
+  document.getElementById('addAttemptBtn').style.display = 'none';
+}
+function hideAttemptForm(){
+  document.getElementById('attemptForm').style.display = 'none';
+  document.getElementById('addAttemptBtn').style.display = '';
+  editingAttemptId = null;
+}
+function openAttemptForm(id){
+  renderMoldSelect();
+  if(id){
+    const entry = entries.find(x => x.id === editingId);
+    const a = entry && entry.attempts.find(x => x.id === id);
+    if(!a) return;
+    fillAttemptForm(a);
+  } else {
+    clearAttemptForm();
+  }
+  showAttemptForm();
+  document.getElementById('attemptForm').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+async function saveAttempt(){
+  const entry = entries.find(x => x.id === editingId);
+  if(!entry) return;
+  const moldId = document.getElementById('in-att-containerSelect').value;
+  const moldObj = molds.find(x => x.id === moldId);
+  const prev = editingAttemptId ? entry.attempts.find(x => x.id === editingAttemptId) : null;
+  const data = {
+    id: editingAttemptId || uid('att'),
+    date: document.getElementById('in-att-date').value || new Date().toISOString().slice(0,10),
+    myContainerId: moldId || '',
+    myContainerLabel: moldObj ? moldObj.name : '',
+    myVolume: moldObj ? Math.round(moldVolume(moldObj)) : null,
+    scaleRatio: document.getElementById('in-att-scaleRatio').value ? Number(document.getElementById('in-att-scaleRatio').value) : null,
+    myTime: document.getElementById('in-att-myTime').value.trim(),
+    myIngredients: document.getElementById('in-att-myIngredients').value.trim(),
+    resultNotes: document.getElementById('in-att-resultNotes').value.trim(),
+    nextTime: document.getElementById('in-att-nextTime').value.trim(),
+    outcome: attemptPickedOutcome,
+    photos: currentAttemptPhotos.slice(),
+    createdAt: prev ? (prev.createdAt || Date.now()) : Date.now()
+  };
+  if(editingAttemptId){
+    const idx = entry.attempts.findIndex(x => x.id === editingAttemptId);
+    if(idx > -1) entry.attempts[idx] = data;
+  } else {
+    entry.attempts.push(data);
+  }
+  entry.updatedAt = Date.now();
+  statusLine.textContent = '儲存中…';
+  const ok = await persistEntries();
+  statusLine.textContent = ok ? '已儲存這筆調整記錄' : '儲存失敗，本機儲存空間可能已滿';
+  if(ok){
+    expandedAttemptIds = new Set([data.id]);
+    hideAttemptForm();
+    renderAttemptsList();
+    render();
+    setTimeout(()=>{ if(statusLine.textContent==='已儲存這筆調整記錄') statusLine.textContent=''; }, 1500);
+  }
+}
+async function deleteAttempt(id){
+  const entry = entries.find(x => x.id === editingId);
+  if(!entry) return;
+  if(!confirm('確定要刪除這筆調整記錄嗎？此動作無法復原。')) return;
+  entry.attempts = entry.attempts.filter(x => x.id !== id);
+  entry.updatedAt = Date.now();
+  expandedAttemptIds.delete(id);
+  statusLine.textContent = '刪除中…';
+  const ok = await persistEntries();
+  statusLine.textContent = ok ? '已刪除' : '刪除失敗，請再試一次';
+  if(ok){
+    renderAttemptsList();
+    render();
+    setTimeout(()=>{ if(statusLine.textContent==='已刪除') statusLine.textContent=''; }, 1500);
+  }
+}
+function attemptSummaryLine(a){
+  const parts = [];
+  if(a.date) parts.push(a.date);
+  if(a.myContainerLabel) parts.push(a.myContainerLabel);
+  if(a.myTime) parts.push(a.myTime);
+  return parts.join(' · ');
+}
+function renderAttemptsList(){
+  const entry = entries.find(x => x.id === editingId);
+  const list = document.getElementById('attemptsList');
+  if(!entry || !entry.attempts || entry.attempts.length === 0){
+    list.innerHTML = '<p class="field-hint">還沒有調整記錄，做完之後點下方「新增一次調整記錄」記下來。</p>';
+    return;
+  }
+  const ordered = entry.attempts.slice().reverse();
+  list.innerHTML = ordered.map(a => {
+    const outcomeClass = 'outcome-' + (a.outcome || 'none');
+    const expanded = expandedAttemptIds.has(a.id);
+    const items = parseMarkdownTable(a.myIngredients || '');
+    const ingredientsHtml = items.length
+      ? '<table><thead><tr><th>食材</th><th>份量</th><th>單位</th></tr></thead><tbody>' +
+        items.map(it => `<tr><td>${escapeHtml(it.name)}</td><td>${escapeHtml(it.amount)}</td><td>${escapeHtml(it.unit)}</td></tr>`).join('') +
+        '</tbody></table>'
+      : (a.myIngredients ? `<p class="empty-note">${escapeHtml(a.myIngredients)}</p>` : '');
+    const photosHtml = (a.photos||[]).length
+      ? '<div class="photo-grid">' + a.photos.map(p => `<div class="photo-thumb-wrap"><img class="photo-thumb" src="${p}"></div>`).join('') + '</div>'
+      : '';
+    return `
+      <div class="attempt-row ${expanded ? 'expanded' : ''}" data-id="${a.id}">
+        <div class="attempt-row-head" data-action="toggle">
+          <div class="attempt-row-main">
+            <span class="stamp ${outcomeClass}">${outcomeLabel(a.outcome)}</span>
+            <span class="attempt-summary">${escapeHtml(attemptSummaryLine(a)) || '（尚未填寫細節）'}</span>
+          </div>
+          <div class="attempt-row-actions">
+            <button type="button" class="icon-btn" data-action="edit" aria-label="編輯這筆調整記錄">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            </button>
+            <button type="button" class="icon-btn" data-action="delete" aria-label="刪除這筆調整記錄">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+            </button>
+            <span class="chevron">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </span>
+          </div>
+        </div>
+        <div class="attempt-detail" ${expanded ? '' : 'style="display:none;"'}>
+          ${a.scaleRatio ? `<p class="attempt-detail-line"><span class="label">換算倍率</span>${escapeHtml(String(a.scaleRatio))}</p>` : ''}
+          ${ingredientsHtml}
+          ${a.resultNotes ? `<div class="attempt-detail-block"><span class="label">成果描述</span><p>${escapeHtml(a.resultNotes)}</p></div>` : ''}
+          ${a.nextTime ? `<div class="attempt-detail-block"><span class="label">下次調整</span><p>${escapeHtml(a.nextTime)}</p></div>` : ''}
+          ${photosHtml}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ---------- entry form (source-level info) ---------- */
+function clearForm(){
+  ['title','videoUrl','videoNote','srcContainer','srcVolume','srcTime','srcIngredients','tags'].forEach(k=>{
+    document.getElementById('in-'+k).value = '';
+  });
+  document.getElementById('aiStatusHint').textContent = '';
   renderMdPreview('in-srcIngredients', 'srcPreview');
-  renderMdPreview('in-myIngredients', 'myPreview');
   document.getElementById('f-title').classList.remove('invalid');
   document.getElementById('exportBtn').style.display = 'none';
 }
 function fillForm(e){
   document.getElementById('in-title').value = e.title || '';
-  document.getElementById('in-date').value = e.date || '';
   document.getElementById('in-videoUrl').value = e.videoUrl || '';
   document.getElementById('in-videoNote').value = e.videoNote || '';
   document.getElementById('in-srcContainer').value = e.srcContainer || '';
   document.getElementById('in-srcVolume').value = e.srcVolume || '';
   document.getElementById('in-srcTime').value = e.srcTime || '';
   document.getElementById('in-srcIngredients').value = e.srcIngredients || '';
-  document.getElementById('in-myContainerSelect').value = e.myContainerId || '';
-  document.getElementById('in-scaleRatio').value = e.scaleRatio || '';
-  document.getElementById('in-myTime').value = e.myTime || '';
-  resetTimeSyncTracking();
-  document.getElementById('in-myIngredients').value = e.myIngredients || '';
-  document.getElementById('in-resultNotes').value = e.resultNotes || '';
-  document.getElementById('in-nextTime').value = e.nextTime || '';
   document.getElementById('in-tags').value = (e.tags||[]).join(', ');
   document.getElementById('aiStatusHint').textContent = '';
-  pickedOutcome = e.outcome || '';
-  currentPhotos = (e.photos || (e.photo ? [e.photo] : [])).slice();
-  renderPhotoArea();
-  updateOutcomePicker();
   renderMdPreview('in-srcIngredients', 'srcPreview');
-  renderMdPreview('in-myIngredients', 'myPreview');
   document.getElementById('exportBtn').style.display = 'inline-block';
-}
-function updateOutcomePicker(){
-  document.querySelectorAll('.outcome-opt').forEach(el=>{
-    el.className = 'outcome-opt' + (el.dataset.val === pickedOutcome ? ' picked-' + pickedOutcome : '');
-  });
 }
 function openModal(id){
   editingId = id || null;
   const deleteBtn = document.getElementById('deleteBtn');
-  renderMoldSelect();
+  hideAttemptForm();
   if(id){
     const e = entries.find(x => x.id === id);
     if(!e) return;
     document.getElementById('modalTitle').textContent = '編輯紀錄';
     fillForm(e);
+    document.getElementById('attemptsFieldset').style.display = '';
+    expandedAttemptIds = new Set();
+    const latest = latestAttempt(e);
+    if(latest) expandedAttemptIds.add(latest.id);
+    renderMoldSelect();
+    renderAttemptsList();
     deleteBtn.style.display = 'inline-block';
   } else {
     document.getElementById('modalTitle').textContent = '新增紀錄';
     clearForm();
+    document.getElementById('attemptsFieldset').style.display = 'none';
     deleteBtn.style.display = 'none';
   }
   overlay.classList.add('open');
 }
-function openModalWithImportedData(data){
-  editingId = null;
-  document.getElementById('modalTitle').textContent = '匯入的紀錄（確認後儲存）';
-  clearForm();
-  document.getElementById('in-title').value = data.title || '';
-  document.getElementById('in-date').value = data.date || new Date().toISOString().slice(0,10);
-  document.getElementById('in-videoUrl').value = data.videoUrl || '';
-  document.getElementById('in-videoNote').value = data.videoNote || '';
-  document.getElementById('in-srcContainer').value = data.srcContainer || '';
-  document.getElementById('in-srcVolume').value = data.srcVolume || '';
-  document.getElementById('in-srcTime').value = data.srcTime || '';
-  document.getElementById('in-srcIngredients').value = data.srcIngredients || '';
-  document.getElementById('in-scaleRatio').value = data.scaleRatio || '';
-  document.getElementById('in-myTime').value = data.myTime || '';
-  resetTimeSyncTracking();
-  document.getElementById('in-myIngredients').value = data.myIngredients || '';
-  document.getElementById('in-resultNotes').value = data.resultNotes || '';
-  document.getElementById('in-nextTime').value = data.nextTime || '';
-  document.getElementById('in-tags').value = (data.tags||[]).join(', ');
-  pickedOutcome = data.outcome || '';
-  currentPhotos = (data.photos || (data.photo ? [data.photo] : [])).slice();
-  renderPhotoArea();
-  updateOutcomePicker();
-  renderMdPreview('in-srcIngredients', 'srcPreview');
-  renderMdPreview('in-myIngredients', 'myPreview');
-  document.getElementById('deleteBtn').style.display = 'none';
-  document.getElementById('exportBtn').style.display = 'none';
-  overlay.classList.add('open');
-  statusLine.textContent = '匯入的內容尚未儲存，確認無誤後請按「儲存紀錄」（模具容器需重新選擇）';
-}
-function closeModal(){ overlay.classList.remove('open'); editingId = null; }
+function closeModal(){ overlay.classList.remove('open'); hideAttemptForm(); editingId = null; }
 
 async function saveEntry(){
   const titleField = document.getElementById('f-title');
@@ -575,50 +741,52 @@ async function saveEntry(){
 
   const tagsRaw = document.getElementById('in-tags').value.trim();
   const tags = tagsRaw ? tagsRaw.split(',').map(t=>t.trim()).filter(Boolean) : [];
-  const moldId = document.getElementById('in-myContainerSelect').value;
-  const moldObj = molds.find(x => x.id === moldId);
+  const now = Date.now();
+  const isNew = !editingId;
 
-  const data = {
-    id: editingId || uid(),
+  const fields = {
     title,
-    date: document.getElementById('in-date').value || new Date().toISOString().slice(0,10),
     videoUrl: document.getElementById('in-videoUrl').value.trim(),
     videoNote: document.getElementById('in-videoNote').value.trim(),
     srcContainer: document.getElementById('in-srcContainer').value.trim(),
     srcVolume: document.getElementById('in-srcVolume').value ? Number(document.getElementById('in-srcVolume').value) : null,
     srcTime: document.getElementById('in-srcTime').value.trim(),
     srcIngredients: document.getElementById('in-srcIngredients').value.trim(),
-    myContainerId: moldId || '',
-    myContainerLabel: moldObj ? moldObj.name : '',
-    myVolume: moldObj ? Math.round(moldVolume(moldObj)) : null,
-    scaleRatio: document.getElementById('in-scaleRatio').value ? Number(document.getElementById('in-scaleRatio').value) : null,
-    myTime: document.getElementById('in-myTime').value.trim(),
-    myIngredients: document.getElementById('in-myIngredients').value.trim(),
-    resultNotes: document.getElementById('in-resultNotes').value.trim(),
-    nextTime: document.getElementById('in-nextTime').value.trim(),
-    tags,
-    outcome: pickedOutcome,
-    photos: currentPhotos.slice()
+    tags
   };
 
-  if(editingId){
-    const idx = entries.findIndex(x => x.id === editingId);
-    if(idx > -1) entries[idx] = data;
+  if(isNew){
+    const newEntry = Object.assign({ id: uid(), attempts: [], createdAt: now, updatedAt: now }, fields);
+    entries.push(newEntry);
+    editingId = newEntry.id;
   } else {
-    entries.push(data);
+    const idx = entries.findIndex(x => x.id === editingId);
+    if(idx > -1){ Object.assign(entries[idx], fields); entries[idx].updatedAt = now; }
   }
 
   statusLine.textContent = '儲存中…';
   const ok = await persistEntries();
   statusLine.textContent = ok ? '已儲存' : '儲存失敗，本機儲存空間可能已滿';
   if(ok){
-    closeModal(); render();
-    setTimeout(()=>{ if(statusLine.textContent==='已儲存') statusLine.textContent=''; }, 1500);
+    render();
+    if(isNew){
+      document.getElementById('modalTitle').textContent = '編輯紀錄';
+      document.getElementById('deleteBtn').style.display = 'inline-block';
+      document.getElementById('exportBtn').style.display = 'inline-block';
+      document.getElementById('attemptsFieldset').style.display = '';
+      expandedAttemptIds = new Set();
+      renderMoldSelect();
+      renderAttemptsList();
+      statusLine.textContent = '已儲存，可以在下方新增這次的調整記錄了';
+    } else {
+      closeModal();
+    }
+    setTimeout(()=>{ if(statusLine.textContent==='已儲存' || statusLine.textContent==='已儲存，可以在下方新增這次的調整記錄了') statusLine.textContent=''; }, 2200);
   }
 }
 async function deleteEntry(){
   if(!editingId) return;
-  if(!confirm('確定要刪除這筆紀錄嗎？此動作無法復原。')) return;
+  if(!confirm('確定要刪除這筆紀錄嗎？所有調整記錄也會一併刪除，此動作無法復原。')) return;
   entries = entries.filter(x => x.id !== editingId);
   statusLine.textContent = '刪除中…';
   const ok = await persistEntries();
@@ -645,14 +813,16 @@ function exportCurrentEntry(){
   if(!editingId) return;
   const e = entries.find(x => x.id === editingId);
   if(!e) return;
-  downloadJSON(e, `${sanitizeFilename(e.title)}_${e.date || ''}.json`);
+  const latest = latestAttempt(e);
+  const dateStr = latest && latest.date ? latest.date : new Date(e.updatedAt || Date.now()).toISOString().slice(0,10);
+  downloadJSON(e, `${sanitizeFilename(e.title)}_${dateStr}.json`);
 }
 function handleImportFile(ev){
   const file = ev.target.files && ev.target.files[0];
   ev.target.value = '';
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     try{
       const data = JSON.parse(reader.result);
       if(!data || typeof data !== 'object' || Array.isArray(data)){
@@ -662,7 +832,24 @@ function handleImportFile(ev){
         statusLine.textContent = '這個檔案看起來不是有效的紀錄（缺少名稱）';
         return;
       }
-      openModalWithImportedData(data);
+      migrateEntry(data);
+      const imported = Object.assign({}, data, {
+        id: uid(),
+        attempts: data.attempts.map(a => Object.assign({}, a, { id: uid('att'), myContainerId: '', myContainerLabel: '' })),
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+      entries.push(imported);
+      statusLine.textContent = '匯入中…';
+      const ok = await persistEntries();
+      if(ok){
+        render();
+        openModal(imported.id);
+        statusLine.textContent = imported.attempts.length ? '已匯入，模具容器需重新選擇' : '已匯入';
+        setTimeout(()=>{ statusLine.textContent=''; }, 3000);
+      } else {
+        statusLine.textContent = '匯入失敗，本機儲存空間可能已滿';
+      }
     }catch(e){
       statusLine.textContent = '匯入失敗，請確認是先前匯出的 JSON 檔案';
       setTimeout(()=>{ if(statusLine.textContent==='匯入失敗，請確認是先前匯出的 JSON 檔案') statusLine.textContent=''; }, 2500);
@@ -678,12 +865,6 @@ document.getElementById('closeBtn').addEventListener('click', closeModal);
 document.getElementById('saveBtn').addEventListener('click', saveEntry);
 document.getElementById('deleteBtn').addEventListener('click', deleteEntry);
 document.getElementById('exportBtn').addEventListener('click', exportCurrentEntry);
-document.getElementById('outcomePicker').addEventListener('click', (ev)=>{
-  const opt = ev.target.closest('.outcome-opt');
-  if(!opt) return;
-  pickedOutcome = opt.dataset.val;
-  updateOutcomePicker();
-});
 overlay.addEventListener('click', (ev)=>{ if(ev.target === overlay) closeModal(); });
 searchInput.addEventListener('input', render);
 
@@ -692,7 +873,29 @@ document.getElementById('importBtn').addEventListener('click', ()=>{
 });
 document.getElementById('importFile').addEventListener('change', handleImportFile);
 
-document.getElementById('in-photoFile').addEventListener('change', async (ev)=>{
+document.getElementById('addAttemptBtn').addEventListener('click', ()=>openAttemptForm(null));
+document.getElementById('cancelAttemptBtn').addEventListener('click', hideAttemptForm);
+document.getElementById('saveAttemptBtn').addEventListener('click', saveAttempt);
+document.getElementById('attOutcomePicker').addEventListener('click', (ev)=>{
+  const opt = ev.target.closest('.outcome-opt');
+  if(!opt) return;
+  attemptPickedOutcome = opt.dataset.val;
+  updateAttemptOutcomePicker();
+});
+document.getElementById('attemptsList').addEventListener('click', (ev)=>{
+  const row = ev.target.closest('.attempt-row');
+  if(!row) return;
+  const attId = row.dataset.id;
+  if(ev.target.closest('[data-action="edit"]')){ openAttemptForm(attId); return; }
+  if(ev.target.closest('[data-action="delete"]')){ deleteAttempt(attId); return; }
+  if(ev.target.closest('.attempt-row-head')){
+    if(expandedAttemptIds.has(attId)) expandedAttemptIds.delete(attId);
+    else expandedAttemptIds.add(attId);
+    renderAttemptsList();
+  }
+});
+
+document.getElementById('in-att-photoFile').addEventListener('change', async (ev)=>{
   const files = Array.from(ev.target.files || []);
   ev.target.value = '';
   if(files.length === 0) return;
@@ -700,25 +903,25 @@ document.getElementById('in-photoFile').addEventListener('change', async (ev)=>{
   for(const file of files){
     try{
       const compressed = await compressImage(file);
-      currentPhotos.push(compressed);
+      currentAttemptPhotos.push(compressed);
     }catch(err){
       statusLine.textContent = '有一張照片處理失敗，已略過';
     }
   }
-  renderPhotoArea();
+  renderAttemptPhotoArea();
   if(statusLine.textContent === '處理照片中…') statusLine.textContent = '';
 });
 
-document.getElementById('in-myContainerSelect').addEventListener('change', recomputeRatio);
+document.getElementById('in-att-containerSelect').addEventListener('change', recomputeRatio);
 document.getElementById('in-srcVolume').addEventListener('input', recomputeRatio);
 document.getElementById('in-srcTime').addEventListener('input', syncMyTimeFromSrc);
 document.getElementById('aiConvertBtn').addEventListener('click', handleAiConvert);
-document.getElementById('recalcBtn').addEventListener('click', recalcScaledTable);
+document.getElementById('attRecalcBtn').addEventListener('click', recalcScaledTable);
 document.getElementById('in-srcIngredients').addEventListener('input', ()=>renderMdPreview('in-srcIngredients','srcPreview'));
-document.getElementById('in-myIngredients').addEventListener('input', ()=>renderMdPreview('in-myIngredients','myPreview'));
+document.getElementById('in-att-myIngredients').addEventListener('input', ()=>renderMdPreview('in-att-myIngredients','attPreview'));
 
 document.getElementById('moldSettingsBtn').addEventListener('click', openMoldSettings);
-document.getElementById('manageMoldFromForm').addEventListener('click', openMoldSettings);
+document.getElementById('manageMoldFromAttempt').addEventListener('click', openMoldSettings);
 document.getElementById('moldCloseBtn').addEventListener('click', closeMoldSettings);
 moldOverlay.addEventListener('click', (ev)=>{ if(ev.target === moldOverlay) closeMoldSettings(); });
 document.getElementById('mold-shape').addEventListener('change', shapeFieldsSwitch);
