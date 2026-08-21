@@ -300,7 +300,7 @@ function renderMdPreview(textareaId, previewId){
 async function callClaudeConvert(rawText){
   const apiKey = getApiKey();
   if(!apiKey) throw new Error('NO_KEY');
-  const systemPrompt = '你是烘焙食譜整理助手。使用者會貼上從影片或網頁複製的原始食譜文字，內容可能雜亂。請將其中的食材與份量整理出來，只回傳 JSON，不要有任何其他文字、不要加 markdown code fence。JSON 格式為：{"items":[{"name":"食材名稱","amount":數字或null,"unit":"g/ml/tsp/tbsp/cup/顆/g...等單位，若無則空字串"}],"sourceContainer":"文字中提到的容器敘述，若無則null","sourceTime":"文字中提到的烘烤溫度與時間，若無則null"}。amount 請盡量轉成純數字，不要包含文字。';
+  const systemPrompt = '你是烘焙食譜整理助手。使用者會貼上從影片或網頁複製的原始食譜文字，內容可能雜亂，也可能是英文、日文或其他語言。請將其中的食材與份量整理出來，並將輸出內容全部翻譯成繁體中文，不要保留原文語言（包含食材名稱、單位、容器敘述、溫度時間敘述都要翻成繁體中文）。只回傳 JSON，不要有任何其他文字、不要加 markdown code fence。JSON 格式為：{"items":[{"name":"食材名稱（繁體中文）","amount":數字或null,"unit":"單位，一律使用繁體中文，例如 克、毫升、小匙、大匙、杯、顆、包 等，若無則空字串"}],"sourceContainer":"文字中提到的容器敘述，翻成繁體中文，若無則null","sourceTime":"文字中提到的烘烤溫度與時間，翻成繁體中文敘述，若無則null"}。amount 請盡量轉成純數字，不要包含文字。';
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
