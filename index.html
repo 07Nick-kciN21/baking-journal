@@ -84,7 +84,7 @@
         <label>原始烘烤溫度／時間</label>
         <input type="text" id="in-srcTime" placeholder="例如：180°C／35分鐘">
       </div>
-      <div class="field">
+      <div class="field" style="margin-bottom:12px;">
         <div class="field-label-row">
           <label>原始食材與份量（貼上影片食譜文字，或直接寫 Markdown 表格）</label>
           <button type="button" class="mini-btn" id="aiConvertBtn">AI 轉換為表格</button>
@@ -92,6 +92,14 @@
         <textarea id="in-srcIngredients" placeholder="貼上影片食譜內容，可點右上角「AI 轉換為表格」自動整理成 Markdown 表格"></textarea>
         <p class="field-hint" id="aiStatusHint"></p>
         <div class="md-preview" id="srcPreview"></div>
+      </div>
+      <div class="field">
+        <div class="field-label-row">
+          <label>製作流程（貼上影片教學文字，或直接輸入步驟）</label>
+          <button type="button" class="mini-btn" id="aiStepsConvertBtn">AI 翻譯為中文步驟</button>
+        </div>
+        <textarea id="in-srcSteps" placeholder="貼上影片教學中的製作流程文字，可點右上角「AI 翻譯為中文步驟」自動整理成繁體中文步驟"></textarea>
+        <p class="field-hint" id="aiStepsStatusHint"></p>
       </div>
     </fieldset>
 

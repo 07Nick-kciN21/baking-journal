@@ -367,6 +367,67 @@ async function handleAiConvert(){
     setTimeout(()=>{ if(hint.textContent==='已轉換成表格') hint.textContent=''; }, 2500);
   }
 }
+async function callClaudeTranslateSteps(rawText){
+  const apiKey = getApiKey();
+  if(!apiKey) throw new Error('NO_KEY');
+  const systemPrompt = '你是烘焙食譜整理助手。使用者會貼上從影片字幕或網頁複製的原始製作流程／步驟文字，內容可能雜亂、有時間軸或雜訊，也可能是英文、日文或其他語言。請將其整理成清楚有條理的繁體中文步驟，翻譯成繁體中文、不要保留原文語言，每個步驟獨立一行，前面加上流水號（例如「1. 」「2. 」），步驟之間不要有多餘的空行。只回傳整理好的步驟文字本身，不要有任何其他說明文字、不要用 JSON、不要加 markdown code fence。';
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1500,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: rawText }]
+    })
+  });
+  if(!response.ok){
+    if(response.status === 401) throw new Error('BAD_KEY');
+    throw new Error('API_ERROR');
+  }
+  const data = await response.json();
+  const textBlock = (data.content || []).find(b => b.type === 'text');
+  if(!textBlock) throw new Error('沒有取得回應內容');
+  return textBlock.text.replace(/```[a-z]*|```/g, '').trim();
+}
+async function handleAiStepsConvert(){
+  const raw = document.getElementById('in-srcSteps').value.trim();
+  const hint = document.getElementById('aiStepsStatusHint');
+  const btn = document.getElementById('aiStepsConvertBtn');
+  if(!raw){
+    hint.textContent = '請先貼上原始製作流程文字';
+    hint.className = 'field-hint warn';
+    return;
+  }
+  if(!getApiKey()){
+    hint.textContent = '請先在右上角「API 設定」輸入你的 Anthropic API key';
+    hint.className = 'field-hint warn';
+    openApiSettings();
+    return;
+  }
+  btn.disabled = true;
+  hint.className = 'field-hint';
+  hint.textContent = 'AI 翻譯整理中…';
+  try{
+    const steps = await callClaudeTranslateSteps(raw);
+    if(!steps) throw new Error('EMPTY');
+    document.getElementById('in-srcSteps').value = steps;
+    hint.textContent = '已翻譯成中文步驟';
+  }catch(e){
+    hint.className = 'field-hint warn';
+    if(e.message === 'BAD_KEY') hint.textContent = 'API key 無效或已過期，請到「API 設定」重新輸入';
+    else if(e.message === 'EMPTY') hint.textContent = '沒有取得整理後的步驟，請確認貼上的內容';
+    else hint.textContent = '轉換失敗，請確認網路連線或稍後再試';
+  }finally{
+    btn.disabled = false;
+    setTimeout(()=>{ if(hint.textContent==='已翻譯成中文步驟') hint.textContent=''; }, 2500);
+  }
+}
 function recalcScaledTable(){
   const items = parseMarkdownTable(document.getElementById('in-srcIngredients').value);
   if(items.length === 0){
@@ -446,7 +507,7 @@ function matchesSearch(entry, q){
   if(!q) return true;
   q = q.toLowerCase();
   const attemptText = (entry.attempts||[]).map(a => [a.resultNotes, a.nextTime, a.myTime, a.myIngredients].join(' ')).join(' ');
-  const hay = [entry.title, entry.videoNote, entry.srcContainer, attemptText, (entry.tags||[]).join(' ')].join(' ').toLowerCase();
+  const hay = [entry.title, entry.videoNote, entry.srcContainer, entry.srcSteps, attemptText, (entry.tags||[]).join(' ')].join(' ').toLowerCase();
   return hay.includes(q);
 }
 function render(){
@@ -686,10 +747,11 @@ function renderAttemptsList(){
 
 /* ---------- entry form (source-level info) ---------- */
 function clearForm(){
-  ['title','videoUrl','videoNote','srcContainer','srcVolume','srcTime','srcIngredients','tags'].forEach(k=>{
+  ['title','videoUrl','videoNote','srcContainer','srcVolume','srcTime','srcIngredients','srcSteps','tags'].forEach(k=>{
     document.getElementById('in-'+k).value = '';
   });
   document.getElementById('aiStatusHint').textContent = '';
+  document.getElementById('aiStepsStatusHint').textContent = '';
   renderMdPreview('in-srcIngredients', 'srcPreview');
   document.getElementById('f-title').classList.remove('invalid');
   document.getElementById('exportBtn').style.display = 'none';
@@ -702,8 +764,10 @@ function fillForm(e){
   document.getElementById('in-srcVolume').value = e.srcVolume || '';
   document.getElementById('in-srcTime').value = e.srcTime || '';
   document.getElementById('in-srcIngredients').value = e.srcIngredients || '';
+  document.getElementById('in-srcSteps').value = e.srcSteps || '';
   document.getElementById('in-tags').value = (e.tags||[]).join(', ');
   document.getElementById('aiStatusHint').textContent = '';
+  document.getElementById('aiStepsStatusHint').textContent = '';
   renderMdPreview('in-srcIngredients', 'srcPreview');
   document.getElementById('exportBtn').style.display = 'inline-block';
 }
@@ -752,6 +816,7 @@ async function saveEntry(){
     srcVolume: document.getElementById('in-srcVolume').value ? Number(document.getElementById('in-srcVolume').value) : null,
     srcTime: document.getElementById('in-srcTime').value.trim(),
     srcIngredients: document.getElementById('in-srcIngredients').value.trim(),
+    srcSteps: document.getElementById('in-srcSteps').value.trim(),
     tags
   };
 
@@ -916,6 +981,7 @@ document.getElementById('in-att-containerSelect').addEventListener('change', rec
 document.getElementById('in-srcVolume').addEventListener('input', recomputeRatio);
 document.getElementById('in-srcTime').addEventListener('input', syncMyTimeFromSrc);
 document.getElementById('aiConvertBtn').addEventListener('click', handleAiConvert);
+document.getElementById('aiStepsConvertBtn').addEventListener('click', handleAiStepsConvert);
 document.getElementById('attRecalcBtn').addEventListener('click', recalcScaledTable);
 document.getElementById('in-srcIngredients').addEventListener('input', ()=>renderMdPreview('in-srcIngredients','srcPreview'));
 document.getElementById('in-att-myIngredients').addEventListener('input', ()=>renderMdPreview('in-att-myIngredients','attPreview'));
