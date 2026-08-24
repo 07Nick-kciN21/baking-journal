@@ -142,7 +142,7 @@
   .field-hint{font-size:12px;color:var(--ink-soft);margin-top:-2px;}
   .field-hint.warn{color:var(--berry-deep);}
 
-  .field-label-row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+  .field-label-row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;min-height:29px;}
   .btn-group{display:flex;gap:6px;}
   .mini-btn{
     font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--line-strong);
