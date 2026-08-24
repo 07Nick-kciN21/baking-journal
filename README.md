@@ -2,6 +2,8 @@
 
 純前端靜態網頁工具（`index.html` + `style.css` + `script.js`），記錄每次做蛋糕時如何從影片食譜換算容器與時間、成果如何、下次要改什麼。
 
+畫面互動邏輯使用 [jQuery](https://jquery.com/)（透過 `code.jquery.com` CDN 載入），所以**開啟頁面需要網路連線**才能載入 jQuery，之後的操作、資料儲存則跟以往一樣完全在瀏覽器本機進行。
+
 ## 部署到 GitHub Pages
 
 1. 建一個新的 GitHub repository（public 或 private 皆可，若用 GitHub 免費方案的 Pages 功能，private repo 也能開啟 Pages）。
